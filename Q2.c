@@ -1,5 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h> 
+#include <stdlib.h>
+#include <string.h> 
 
 typedef struct Node {
     int value;
@@ -31,16 +32,16 @@ Node* insert(Node* root, int value) {
     if (value < root->value) {
         root->left = insert(root->left, value);
     }
-    else {
+    else { 
         root->right = insert(root->right, value);
     }
 
-    return root;
+    return root; 
 }
 
 int sumSubtree(Node* node) {
     if (node == NULL) {
-        return 0;
+        return 0; 
     }
     return node->value + sumSubtree(node->left) + sumSubtree(node->right);
 }
@@ -52,9 +53,8 @@ void preOrderTraversalAndPrint(Node* root, FILE* outputFile) {
 
     int sumRight = sumSubtree(root->right);
     int sumLeft = sumSubtree(root->left);
-
     int difference = sumRight - sumLeft;
-  
+
     fprintf(outputFile, "%d (%d) ", root->value, difference);
 
     preOrderTraversalAndPrint(root->left, outputFile);
@@ -66,45 +66,46 @@ void destroyTree(Node* root) {
     if (root == NULL) {
         return;
     }
-    destroyTree(root->left);
-    destroyTree(root->right);
-    free(root);
+    destroyTree(root->left);  
+    destroyTree(root->right); 
+    free(root);               
 }
 
 int main() {
-    FILE *inputFile, *outputFile;
-    char line[801]; [cite_start]
+    FILE *inputFile; 
+    FILE *outputFile; 
+    char line[801];   
 
     inputFile = fopen("L2Q2.in", "r");
     if (inputFile == NULL) {
-        perror("Erro ao abrir o arquivo L2Q2.in");
+        perror("Erro ao abrir o arquivo L2Q2.in"); 
         return EXIT_FAILURE;
     }
 
     outputFile = fopen("L2Q2.out", "w");
     if (outputFile == NULL) {
         perror("Erro ao abrir o arquivo L2Q2.out");
-        fclose(inputFile); 
-        return EXIT_FAILURE;
+        fclose(inputFile);
+        return EXIT_FAILURE; 
     }
 
     while (fgets(line, sizeof(line), inputFile) != NULL) {
         Node* root = NULL;
-        int value;
+        int value;        
 
         char *ptr = line;
         int offset;
 
         while (sscanf(ptr, "%d%n", &value, &offset) == 1) {
             root = insert(root, value);
-            ptr += offset; 
+            ptr += offset;
+            
             while (*ptr == ' ' || *ptr == '\t') {
                 ptr++;
             }
         }
-        
         preOrderTraversalAndPrint(root, outputFile);
-        fprintf(outputFile, "\n"); [cite_start]
+        fprintf(outputFile, "\n");
 
         destroyTree(root);
     }
