@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> 
+#include <stdbool.h>
 
 typedef struct Node {
     int value;
@@ -46,7 +47,7 @@ int sumSubtree(Node* node) {
     return node->value + sumSubtree(node->left) + sumSubtree(node->right);
 }
 
-void preOrderTraversalAndPrint(Node* root, FILE* outputFile) {
+void preOrderTraversalAndPrint(Node* root, FILE* outputFile, bool *isFirst) {
     if (root == NULL) {
         return;
     }
@@ -55,11 +56,15 @@ void preOrderTraversalAndPrint(Node* root, FILE* outputFile) {
     int sumLeft = sumSubtree(root->left);
     int difference = sumRight - sumLeft;
 
-    fprintf(outputFile, "%d (%d) ", root->value, difference);
+    if (*isFirst) {
+        fprintf(outputFile, "%d (%d)", root->value, difference);
+        *isFirst = false;
+    } else {
+        fprintf(outputFile, " %d (%d)", root->value, difference);
+    }
 
-    preOrderTraversalAndPrint(root->left, outputFile);
-
-    preOrderTraversalAndPrint(root->right, outputFile);
+    preOrderTraversalAndPrint(root->left, outputFile, isFirst);
+    preOrderTraversalAndPrint(root->right, outputFile, isFirst);
 }
 
 void destroyTree(Node* root) {
@@ -68,7 +73,7 @@ void destroyTree(Node* root) {
     }
     destroyTree(root->left);  
     destroyTree(root->right); 
-    free(root);               
+    free(root);              
 }
 
 int main() {
@@ -89,23 +94,29 @@ int main() {
         return EXIT_FAILURE; 
     }
 
+    bool primeiraLinhaDoArquivo = true;
+
     while (fgets(line, sizeof(line), inputFile) != NULL) {
         Node* root = NULL;
         int value;        
-
         char *ptr = line;
         int offset;
-
+        
         while (sscanf(ptr, "%d%n", &value, &offset) == 1) {
             root = insert(root, value);
             ptr += offset;
-            
-            while (*ptr == ' ' || *ptr == '\t') {
-                ptr++;
-            }
         }
-        preOrderTraversalAndPrint(root, outputFile);
-        fprintf(outputFile, "\n");
+        
+        if (root != NULL) {
+            if (!primeiraLinhaDoArquivo) {
+                fprintf(outputFile, "\n");
+            }
+
+            bool isFirstNode = true;
+            preOrderTraversalAndPrint(root, outputFile, &isFirstNode);
+            
+            primeiraLinhaDoArquivo = false;
+        }
 
         destroyTree(root);
     }
