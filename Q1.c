@@ -2,60 +2,94 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_NODES_PER_LINE 5000
+#define MAX_LINE_LENGTH 10000
+
 typedef struct No {
     int chave;
     int altura;
     struct No *esq, *dir, *pai;
 } No;
 
-No* criarNo(int chave, int altura, No* pai) {
+No* criarNo(int chave, No* pai) {
     No* novo = malloc(sizeof(No));
+    if (novo == NULL) {
+        perror("Failed to allocate memory for new node");
+        exit(EXIT_FAILURE);
+    }
     novo->chave = chave;
-    novo->altura = altura;
     novo->pai = pai;
     novo->esq = novo->dir = NULL;
+    novo->altura = 0;
     return novo;
 }
 
-No* inserir(No* raiz, int chave, int nivel, int* alturaInserida, No* pai, No** noMaximo) {
-    if (raiz == NULL) {
-        *alturaInserida = nivel;
-        No* novo = criarNo(chave, nivel, pai);
-        if (*noMaximo == NULL || chave > (*noMaximo)->chave || (chave == (*noMaximo)->chave && nivel > (*noMaximo)->altura)) {
-            *noMaximo = novo;
-        }
-        return novo;
+void atualizarAlturas(No* raiz, int alturaPai) {
+    if (raiz == NULL) return;
+    raiz->altura = alturaPai + 1;
+    atualizarAlturas(raiz->esq, raiz->altura);
+    atualizarAlturas(raiz->dir, raiz->altura);
+}
+
+void atualizarAlturasRaiz(No* raiz) {
+    if (raiz == NULL) return;
+    raiz->altura = 0;
+    atualizarAlturas(raiz->esq, 0);
+    atualizarAlturas(raiz->dir, 0);
+}
+
+void imprimirInorderDebug(No* no) {
+    if (no == NULL) return;
+    imprimirInorderDebug(no->esq);
+    fprintf(stderr, "(%d H:%d P:%d) ", no->chave, no->altura, no->pai ? no->pai->chave : -1);
+    imprimirInorderDebug(no->dir);
+}
+
+void encontrarNoMaximo(No* raiz, No** noMaximo) {
+    if (raiz == NULL) return;
+
+    if (*noMaximo == NULL || raiz->chave > (*noMaximo)->chave) {
+        *noMaximo = raiz;
+    } else if (raiz->chave == (*noMaximo)->chave && raiz->altura > (*noMaximo)->altura) {
+        *noMaximo = raiz;
     }
 
-    if (chave < raiz->chave) {
-        raiz->esq = inserir(raiz->esq, chave, nivel + 1, alturaInserida, raiz, noMaximo);
-    } else {
-        raiz->dir = inserir(raiz->dir, chave, nivel + 1, alturaInserida, raiz, noMaximo);
+    encontrarNoMaximo(raiz->esq, noMaximo);
+    encontrarNoMaximo(raiz->dir, noMaximo);
+}
+
+void encontrarNoMaisProfundo(No* raiz, No** noProfundo) {
+    if (raiz == NULL) return;
+
+    if (*noProfundo == NULL || raiz->altura > (*noProfundo)->altura) {
+        *noProfundo = raiz;
     }
 
-    return raiz;
+    encontrarNoMaisProfundo(raiz->esq, noProfundo);
+    encontrarNoMaisProfundo(raiz->dir, noProfundo);
 }
 
 No* encontrarPredecessorDoNo(No* no) {
-    if (no->esq) {
-        no = no->esq;
-        while (no->dir)
-            no = no->dir;
-        return no;
+    if (no == NULL) {
+        return NULL;
     }
-    No* p = no->pai;
-    while (p && no == p->esq) {
-        no = p;
-        p = p->pai;
-    }
-    return p;
-}
 
-void atualizarAlturas(No* no, int nivel) {
-    if (no == NULL) return;
-    no->altura = nivel;
-    atualizarAlturas(no->esq, nivel + 1);
-    atualizarAlturas(no->dir, nivel + 1);
+    if (no->esq != NULL) {
+        No* cursor = no->esq;
+        while (cursor->dir != NULL) {
+            cursor = cursor->dir;
+        }
+        return cursor;
+    }
+
+    No* pai = no->pai;
+    No* filho = no;
+    while (pai != NULL && filho == pai->esq) {
+        filho = pai;
+        pai = pai->pai;
+    }
+
+    return pai;
 }
 
 void liberarArvore(No* raiz) {
@@ -66,42 +100,111 @@ void liberarArvore(No* raiz) {
 }
 
 int main() {
-    FILE *fin = fopen("L2Q1.in", "r");
-    FILE *fout = fopen("L2Q1.out", "w");
+    FILE* fin = fopen("L2Q1.in", "r");
+    FILE* fout = fopen("L2Q1.out", "w");
     if (!fin || !fout) {
-        fprintf(stderr, "Erro ao abrir os arquivos.\n");
+        fprintf(stderr, "Erro ao abrir arquivos L2Q1.in ou L2Q1.out\n");
         return 1;
     }
 
-    char linha[1000];
+    char linha[MAX_LINE_LENGTH];
+    int line_num = 0;
+
     while (fgets(linha, sizeof(linha), fin)) {
+        line_num++;
         No* raiz = NULL;
         No* noMaximo = NULL;
-        int altura;
-        int valores[100], n = 0;
+        No* inserted_nodes[MAX_NODES_PER_LINE];
+        int n = 0;
 
         char* ptr = linha;
-        while (sscanf(ptr, "%d", &valores[n]) == 1) {
-            while (*ptr != ' ' && *ptr != '\0' && *ptr != '\n') ptr++;
-            while (*ptr == ' ') ptr++;
-            n++;
+        char* endptr;
+        long val;
+
+        while (1) {
+            val = strtol(ptr, &endptr, 10);
+
+            if (ptr == endptr) {
+                break;
+            }
+
+            if (n >= MAX_NODES_PER_LINE) {
+                break;
+            }
+
+            No* new_node_ptr = NULL;
+            if (raiz == NULL) {
+                raiz = criarNo(val, NULL);
+                new_node_ptr = raiz;
+            } else {
+                No* temp_parent = NULL;
+                No* current = raiz;
+                while(current != NULL) {
+                    temp_parent = current;
+                    if (val < current->chave) {
+                        current = current->esq;
+                    } else { 
+                        current = current->dir;
+                    }
+                }
+                new_node_ptr = criarNo(val, temp_parent);
+                if (val < temp_parent->chave) {
+                    temp_parent->esq = new_node_ptr;
+                } else {
+                    temp_parent->dir = new_node_ptr;
+                }
+            }
+            inserted_nodes[n++] = new_node_ptr;
+
+            ptr = endptr;
+            while (*ptr == ' ' || *ptr == '\t' || *ptr == ',') ptr++;
+
+            if (*ptr == '\n' || *ptr == '\0') {
+                break;
+            }
         }
 
+        if (raiz == NULL && n == 0) {
+            fprintf(fout, "max NaN alt NaN pred NaN\n");
+            continue;
+        }
+        if (raiz == NULL) {
+            fprintf(fout, "Erro interno: raiz nula apos insercao na linha %d\n", line_num);
+            continue;
+        }
+
+        atualizarAlturasRaiz(raiz);
+
         for (int i = 0; i < n; i++) {
-            raiz = inserir(raiz, valores[i], 0, &altura, NULL, &noMaximo);
-            fprintf(fout, "%d", altura);
+            fprintf(fout, "%d", inserted_nodes[i]->altura);
             if (i < n - 1) fprintf(fout, " ");
         }
 
-        atualizarAlturas(raiz, 0);
+        noMaximo = NULL;
+        encontrarNoMaximo(raiz, &noMaximo);
 
-        fprintf(fout, " max %d alt %d pred ", noMaximo->chave, noMaximo->altura);
-        No* pred = encontrarPredecessorDoNo(noMaximo);
-        if (pred)
-            fprintf(fout, "%d\n", pred->chave);
-        else
-            fprintf(fout, "NaN\n");
+        No* noProfundo = NULL;
+        encontrarNoMaisProfundo(raiz, &noProfundo);
 
+        if (noMaximo != NULL && noProfundo != NULL) {
+            fprintf(fout, " max %d alt %d pred ", noMaximo->chave, noProfundo->altura);
+            
+            No* pred = encontrarPredecessorDoNo(noMaximo);
+            if (pred)
+                fprintf(fout, "%d\n", pred->chave);
+            else
+                fprintf(fout, "NaN\n");
+        } else if (noMaximo != NULL) {
+            fprintf(fout, " max %d alt %d pred ", noMaximo->chave, noMaximo->altura);
+            No* pred = encontrarPredecessorDoNo(noMaximo);
+             if (pred)
+                fprintf(fout, "%d\n", pred->chave);
+            else
+                fprintf(fout, "NaN\n");
+        } else {
+            fprintf(fout, " max NaN alt NaN pred NaN\n");
+        }
+        
         liberarArvore(raiz);
     }
 
