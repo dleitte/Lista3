@@ -1,3 +1,4 @@
+//Alunas: Sophia Garcia e Maria Eduarda Souza
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
